@@ -6,9 +6,9 @@ import (
 	"log"
 	"strings"
 
+	glob2 "github.com/gobwas/glob"
 	"github.com/pivotal/indicator-protocol/pkg/indicator"
 	"github.com/pivotal/indicator-protocol/pkg/registry"
-	glob2 "github.com/gobwas/glob"
 	"gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
 	"gopkg.in/src-d/go-git.v4/plumbing/transport"
@@ -18,11 +18,16 @@ import (
 )
 
 type GitGetter func(Source) ([]indicator.Patch, []indicator.Document, error)
+type RepositoryGetter func(Source) (*git.Repository, error)
 
 var getGitPatchesAndDocuments GitGetter = realGitGet
+var getRepository RepositoryGetter = getRealRepository
 
 func SetGitGetter(getter GitGetter) {
 	getGitPatchesAndDocuments = getter
+}
+func SetRepositoryGetter(repositoryGetter RepositoryGetter) {
+	getRepository = repositoryGetter
 }
 
 func Read(configFile string) ([]registry.PatchList, []indicator.Document, error) {
@@ -111,21 +116,8 @@ type Source struct {
 }
 
 func realGitGet(s Source) ([]indicator.Patch, []indicator.Document, error) {
-	storage := memory.NewStorage()
+	r, err := getRepository(s)
 
-	var auth transport.AuthMethod = nil
-	if s.Token != "" {
-		auth = &http.BasicAuth{
-			Username: "github",
-			Password: s.Token,
-		}
-	}
-
-	repo := s.Repository
-	r, err := git.Clone(storage, nil, &git.CloneOptions{
-		Auth: auth,
-		URL:  repo,
-	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to clone repo: %s\n", err)
 	}
@@ -146,6 +138,23 @@ func realGitGet(s Source) ([]indicator.Patch, []indicator.Document, error) {
 	}
 
 	return retrievePatchesAndDocuments(tree.Files(), s.Glob)
+}
+
+func getRealRepository(s Source) (*git.Repository, error) {
+	storage := memory.NewStorage()
+	var auth transport.AuthMethod = nil
+	if s.Token != "" {
+		auth = &http.BasicAuth{
+			Username: "github",
+			Password: s.Token,
+		}
+	}
+	repoURL := s.Repository
+	r, err := git.Clone(storage, nil, &git.CloneOptions{
+		Auth: auth,
+		URL:  repoURL,
+	})
+	return r, err
 }
 
 func retrievePatchesAndDocuments(files *object.FileIter, glob string) ([]indicator.Patch, []indicator.Document, error) {
