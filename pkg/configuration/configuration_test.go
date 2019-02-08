@@ -37,12 +37,16 @@ func TestReadGitConfigurationFile(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	fakeRepository := createTestingRepo(
-			"test_fixtures/patch1.yml",
-			"test_fixtures/patch2.yml",
-			"test_fixtures/indicators1.yml",
-			"test_fixtures/indicators2.yml")
+		"test_fixtures/patch1.yml",
+		"test_fixtures/patch2.yml",
+		"test_fixtures/indicators1.yml",
+		"test_fixtures/indicators2.yml")
 
-	patches, documents, err := configuration.Read("test_fixtures/git_config.yml", fakeRepository)
+	fakeGetter := func(s configuration.Source) (*git.Repository, error) {
+		return fakeRepository, nil
+	}
+
+	patches, documents, err := configuration.Read("test_fixtures/git_config.yml", fakeGetter)
 	g.Expect(err).ToNot(HaveOccurred())
 
 	g.Expect(patches).To(HaveLen(1))
@@ -147,7 +151,6 @@ func createTestingRepo(files ...string) *git.Repository {
 	}
 
 	w, _ := repo.Worktree()
-	log.Println(w)
 
 	for _, f := range files {
 		data, err := ioutil.ReadFile(f)
