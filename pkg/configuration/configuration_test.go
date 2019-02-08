@@ -21,7 +21,7 @@ import (
 func TestReadLocalConfigurationFile(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	patches, _, err := configuration.Read("test_fixtures/local_config.yml")
+	patches, _, err := configuration.Read("test_fixtures/local_config.yml", nil)
 	g.Expect(err).ToNot(HaveOccurred())
 
 	g.Expect(patches).To(HaveLen(2))
@@ -36,17 +36,13 @@ func TestReadLocalConfigurationFile(t *testing.T) {
 func TestReadGitConfigurationFile(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	fakeRepoGetter := func(s configuration.Source) (*git.Repository, error) {
-		return createTestingRepo(
+	fakeRepository := createTestingRepo(
 			"test_fixtures/patch1.yml",
 			"test_fixtures/patch2.yml",
 			"test_fixtures/indicators1.yml",
 			"test_fixtures/indicators2.yml")
-	}
 
-	configuration.SetRepositoryGetter(fakeRepoGetter)
-
-	patches, documents, err := configuration.Read("test_fixtures/git_config.yml")
+	patches, documents, err := configuration.Read("test_fixtures/git_config.yml", fakeRepository)
 	g.Expect(err).ToNot(HaveOccurred())
 
 	g.Expect(patches).To(HaveLen(1))
@@ -114,14 +110,14 @@ func TestFailToReadConfigurationFile(t *testing.T) {
 	t.Run("returns an error if config file cannot be read", func(t *testing.T) {
 		g := NewGomegaWithT(t)
 
-		_, _, err := configuration.Read(`files are overrated`)
+		_, _, err := configuration.Read(`files are overrated`, nil)
 		g.Expect(err).To(MatchError(ContainSubstring("error reading configuration file:")))
 	})
 
 	t.Run("returns an error if config cannot be parsed", func(t *testing.T) {
 		g := NewGomegaWithT(t)
 
-		_, _, err := configuration.Read("test_fixtures/bad.yml")
+		_, _, err := configuration.Read("test_fixtures/bad.yml", nil)
 		g.Expect(err).To(MatchError(ContainSubstring("error parsing configuration file:")))
 	})
 
@@ -131,7 +127,7 @@ func TestFailToReadConfigurationFile(t *testing.T) {
 
 		g := NewGomegaWithT(t)
 
-		patches, _, err := configuration.Read("test_fixtures/partial_bad.yml")
+		patches, _, err := configuration.Read("test_fixtures/partial_bad.yml", nil)
 		g.Expect(err).ToNot(HaveOccurred())
 
 		g.Expect(patches).To(HaveLen(1))
@@ -141,13 +137,13 @@ func TestFailToReadConfigurationFile(t *testing.T) {
 	})
 }
 
-func createTestingRepo(files ...string) (*git.Repository, error) {
+func createTestingRepo(files ...string) *git.Repository {
 	storage := memory.NewStorage()
 	fs := memfs.New()
 
 	repo, err := git.Init(storage, fs)
 	if err != nil {
-		return nil, fmt.Errorf("could not create repo: %s", err)
+		panic(fmt.Sprintf("could not create repo: %s", err))
 	}
 
 	w, _ := repo.Worktree()
@@ -156,14 +152,14 @@ func createTestingRepo(files ...string) (*git.Repository, error) {
 	for _, f := range files {
 		data, err := ioutil.ReadFile(f)
 		if err != nil {
-			return nil, fmt.Errorf("could not read file '%s': %s", f, err)
+			panic(fmt.Errorf("could not read file '%s': %s", f, err))
 		}
 
 		_ = util.WriteFile(fs, f, data, 0644)
 
 		_, err = w.Add(f)
 		if err != nil {
-			return nil, fmt.Errorf("could not add file '%s' to test repository: %s", f, err)
+			panic(fmt.Errorf("could not add file '%s' to test repository: %s", f, err))
 		}
 	}
 
@@ -175,8 +171,8 @@ func createTestingRepo(files ...string) (*git.Repository, error) {
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("could not create commit: %s", err)
+		panic(fmt.Errorf("could not create commit: %s", err))
 	}
 
-	return repo, nil
+	return repo
 }
