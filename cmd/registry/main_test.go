@@ -37,11 +37,12 @@ func TestIndicatorRegistry(t *testing.T) {
 		},
 	}
 
-	t.Run("it saves and exposes indicator documents", func(t *testing.T) {
+	t.Run("it patches indicator documents when received", func(t *testing.T) {
 		g := NewGomegaWithT(t)
 
-		withServer("10567", g, func(serverUrl string) {
-			file, err := os.Open("../../example.yml")
+		buffer := bytes.NewBuffer(nil)
+		withConfigServer("10567", "test_fixtures/git_config.yml", buffer, g, func(serverUrl string) {
+			file, err := os.Open("test_fixtures/moar_indicators.yml")
 			g.Expect(err).ToNot(HaveOccurred())
 
 			resp, err := client.Post(serverUrl+"/v1/register", "text/plain", file)
@@ -56,41 +57,16 @@ func TestIndicatorRegistry(t *testing.T) {
 			responseBytes, err := ioutil.ReadAll(resp.Body)
 			g.Expect(err).ToNot(HaveOccurred())
 
-			json, err := ioutil.ReadFile("test_fixtures/example_response.json")
+			g.Expect(buffer.String()).To(ContainSubstring("registered patch for name: my-other-component version: 1.2.3"))
+
+			json, err := ioutil.ReadFile("test_fixtures/example_patched_response.json")
 			g.Expect(err).ToNot(HaveOccurred())
 
-			g.Expect(len(json)).To(BeNumerically(">", 200))
 			g.Expect(responseBytes).To(MatchJSON(json))
 		})
 	})
 
-	t.Run("it loads patches from git sources", func(t *testing.T) {
-		g := NewGomegaWithT(t)
-		buffer := bytes.NewBuffer(nil)
-
-		withConfigServer("10567", "test_fixtures/git_config.yml", buffer, g, func(serverUrl string) {
-			results := buffer.String()
-			g.Expect(results).To(ContainSubstring("registered patch for name: my-blob version: 1.2.3"))
-			g.Expect(results).To(ContainSubstring("registered patch for name: much-yaml-component version: 1.2.3"))
-			g.Expect(results).ToNot(ContainSubstring("registered patch for\n"))
-		})
-	})
-
-	t.Run("it loads indicator documents from git sources", func(t *testing.T) {
-		g := NewGomegaWithT(t)
-		buffer := bytes.NewBuffer(nil)
-
-		withConfigServer("10567", "test_fixtures/git_config.yml", buffer, g, func(serverUrl string) {
-			resp, err := client.Get(serverUrl + "/v1/indicator-documents")
-			g.Expect(err).ToNot(HaveOccurred())
-			g.Expect(resp.StatusCode).To(Equal(http.StatusOK))
-
-			responseBytes, err := ioutil.ReadAll(resp.Body)
-			g.Expect(err).ToNot(HaveOccurred())
-			g.Expect(responseBytes).To(ContainSubstring("only_in_example_yml"))
-		})
-	})
-
+	// TODO move this test to `configuration` package
 	t.Run("it loads documents and patches from git sources based on glob", func(t *testing.T) {
 		g := NewGomegaWithT(t)
 		buffer := bytes.NewBuffer(nil)
@@ -111,50 +87,11 @@ func TestIndicatorRegistry(t *testing.T) {
 		})
 	})
 
-	t.Run("it patches indicator documents when received", func(t *testing.T) {
-		g := NewGomegaWithT(t)
-
-		buffer := bytes.NewBuffer(nil)
-		withConfigServer("10567", "test_fixtures/local_config.yml", buffer, g, func(serverUrl string) {
-			file, err := os.Open("../../example.yml")
-			g.Expect(err).ToNot(HaveOccurred())
-
-			resp, err := client.Post(serverUrl+"/v1/register", "text/plain", file)
-			g.Expect(err).ToNot(HaveOccurred())
-
-			g.Expect(resp.StatusCode, resp.Body).To(Equal(http.StatusOK))
-
-			resp, err = client.Get(serverUrl + "/v1/indicator-documents")
-			g.Expect(err).ToNot(HaveOccurred())
-			g.Expect(resp.StatusCode).To(Equal(http.StatusOK))
-
-			responseBytes, err := ioutil.ReadAll(resp.Body)
-			g.Expect(err).ToNot(HaveOccurred())
-
-			g.Expect(buffer.String()).To(ContainSubstring("registered patch for name: my-component version: 1.2.3"))
-
-			json, err := ioutil.ReadFile("test_fixtures/example_patched_response.json")
-			g.Expect(err).ToNot(HaveOccurred())
-
-			g.Expect(len(json)).To(BeNumerically(">", 200))
-			g.Expect(responseBytes).To(MatchJSON(json))
-		})
-	})
-
-	t.Run("it exposes a metrics endpoint", func(t *testing.T) {
-		g := NewGomegaWithT(t)
-		withServer("10568", g, func(serverUrl string) {
-			resp, err := client.Get(serverUrl + "/metrics")
-			g.Expect(err).ToNot(HaveOccurred())
-			g.Expect(resp.StatusCode).To(Equal(http.StatusOK))
-		})
-	})
-
 	t.Run("it records metrics for all endpoints", func(t *testing.T) {
 		g := NewGomegaWithT(t)
 
 		withServer("10569", g, func(serverUrl string) {
-			file, err := os.Open("../../example.yml")
+			file, err := os.Open("../../example_indicators.yml")
 			g.Expect(err).ToNot(HaveOccurred())
 
 			resp, err := client.Post(serverUrl+"/v1/register?deployment=redis-abc&service=redis", "text/plain", file)

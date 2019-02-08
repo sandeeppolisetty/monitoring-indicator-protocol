@@ -21,7 +21,9 @@ import (
 func TestReadLocalConfigurationFile(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	patches, _, err := configuration.Read("test_fixtures/local_config.yml", nil)
+	sourceFile, _ := configuration.ParseSourcesFile("test_fixtures/local_config.yml")
+
+	patches, _, err := configuration.Read(sourceFile, nil)
 	g.Expect(err).ToNot(HaveOccurred())
 
 	g.Expect(patches).To(HaveLen(2))
@@ -46,7 +48,9 @@ func TestReadGitConfigurationFile(t *testing.T) {
 		return fakeRepository, nil
 	}
 
-	patches, documents, err := configuration.Read("test_fixtures/git_config.yml", fakeGetter)
+	sources, _ := configuration.ParseSourcesFile("test_fixtures/git_config.yml")
+
+	patches, documents, err := configuration.Read(sources, fakeGetter)
 	g.Expect(err).ToNot(HaveOccurred())
 
 	g.Expect(patches).To(HaveLen(1))
@@ -61,11 +65,17 @@ func TestReadGitConfigurationFile(t *testing.T) {
 
 }
 
+//func TestGlobMatching(t *testing.T) {
+//	g := NewGomegaWithT(t)
+//
+//
+//}
+
 func TestValidateConfigFile(t *testing.T) {
 	t.Run("does not return error if token is not provided with SSH git repo", func(t *testing.T) {
 		g := NewGomegaWithT(t)
 
-		err := configuration.Validate(configuration.File{
+		err := configuration.Validate(configuration.SourcesFile{
 			Sources: []configuration.Source{{
 				Type:       "git",
 				Repository: "git@fakegit.nope:slowens/test-repo.git",
@@ -77,7 +87,7 @@ func TestValidateConfigFile(t *testing.T) {
 	t.Run("returns error if token is provided with SSH git repo", func(t *testing.T) {
 		g := NewGomegaWithT(t)
 
-		err := configuration.Validate(configuration.File{
+		err := configuration.Validate(configuration.SourcesFile{
 			Sources: []configuration.Source{{
 				Type:       "git",
 				Repository: "git@fakegit.nope:slowens/test-repo.git",
@@ -90,7 +100,7 @@ func TestValidateConfigFile(t *testing.T) {
 	t.Run("returns error if repo isn't provided in git source", func(t *testing.T) {
 		g := NewGomegaWithT(t)
 
-		err := configuration.Validate(configuration.File{
+		err := configuration.Validate(configuration.SourcesFile{
 			Sources: []configuration.Source{{
 				Type: "git",
 			}},
@@ -101,7 +111,7 @@ func TestValidateConfigFile(t *testing.T) {
 	t.Run("returns error if path isn't provided in local source", func(t *testing.T) {
 		g := NewGomegaWithT(t)
 
-		err := configuration.Validate(configuration.File{
+		err := configuration.Validate(configuration.SourcesFile{
 			Sources: []configuration.Source{{
 				Type: "local",
 			}},
@@ -110,18 +120,18 @@ func TestValidateConfigFile(t *testing.T) {
 	})
 }
 
-func TestFailToReadConfigurationFile(t *testing.T) {
+func TestFailToParseConfigurationFile(t *testing.T) {
 	t.Run("returns an error if config file cannot be read", func(t *testing.T) {
 		g := NewGomegaWithT(t)
 
-		_, _, err := configuration.Read(`files are overrated`, nil)
+		_, err := configuration.ParseSourcesFile(`files are overrated`)
 		g.Expect(err).To(MatchError(ContainSubstring("error reading configuration file:")))
 	})
 
 	t.Run("returns an error if config cannot be parsed", func(t *testing.T) {
 		g := NewGomegaWithT(t)
 
-		_, _, err := configuration.Read("test_fixtures/bad.yml", nil)
+		_, err := configuration.ParseSourcesFile("test_fixtures/bad.yml")
 		g.Expect(err).To(MatchError(ContainSubstring("error parsing configuration file:")))
 	})
 
@@ -131,13 +141,15 @@ func TestFailToReadConfigurationFile(t *testing.T) {
 
 		g := NewGomegaWithT(t)
 
-		patches, _, err := configuration.Read("test_fixtures/partial_bad.yml", nil)
+		sourceFile, _ := configuration.ParseSourcesFile("test_fixtures/partial_bad.yml")
+
+		patches, _, err := configuration.Read(sourceFile, nil)
 		g.Expect(err).ToNot(HaveOccurred())
 
 		g.Expect(patches).To(HaveLen(1))
 		g.Expect(*patches[0].Patches[0].Match.Name).To(Equal("my-component-1"))
 
-		g.Expect(buffer.String()).To(ContainSubstring("failed to read patch badpath/nothing_here.yml from config file test_fixtures/partial_bad.yml"))
+		g.Expect(buffer.String()).To(ContainSubstring("failed to read local patch badpath/nothing_here.yml"))
 	})
 }
 
