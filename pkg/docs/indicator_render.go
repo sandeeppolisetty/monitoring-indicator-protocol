@@ -101,7 +101,7 @@ func (p indicatorPresenter) OtherDocumentationFields() map[string]template.HTML 
 
 	for k, v := range p.Documentation {
 		if isUnusedDocumentationField(k) {
-			words := splitStringOnUppercase(k)
+			words := splitOnUppercase(k)
 			title := strings.Title(strings.Replace(strings.Join(words, " "), "_", " ", -1))
 			fields[title] = template.HTML(blackfriday.Run([]byte(v)))
 		}
@@ -110,7 +110,7 @@ func (p indicatorPresenter) OtherDocumentationFields() map[string]template.HTML 
 	return fields
 }
 
-func splitStringOnUppercase(k string) []string {
+func splitOnUppercase(k string) []string {
 	var words []string
 	l := 0
 	for s := k; s != ""; s = s[l:] {
