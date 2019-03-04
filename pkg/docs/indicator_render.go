@@ -110,15 +110,15 @@ func (p indicatorPresenter) OtherDocumentationFields() map[string]template.HTML 
 	return fields
 }
 
-func splitOnUppercase(k string) []string {
+func splitOnUppercase(s string) []string {
 	var words []string
-	l := 0
-	for s := k; s != ""; s = s[l:] {
-		l = strings.IndexFunc(s[1:], unicode.IsUpper) + 1
-		if l <= 0 {
-			l = len(s)
+	index := 0
+	for string := s; string != ""; string = string[index:] {
+		index = strings.IndexFunc(string[1:], unicode.IsUpper) + 1
+		if index <= 0 {
+			index = len(string)
 		}
-		words = append(words, s[:l])
+		words = append(words, string[:index])
 	}
 	return words
 }
