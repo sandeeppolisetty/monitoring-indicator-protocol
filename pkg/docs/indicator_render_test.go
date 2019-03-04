@@ -46,7 +46,6 @@ func TestRenderIndicatorHTML(t *testing.T) {
 		ind := docs.NewIndicatorPresenter(indicator)
 		html := string(ind.HTML())
 
-
 		g.Expect(html).To(ContainSubstring("<p><em>test description</em> of kpi</p>"))
 		g.Expect(html).To(ContainSubstring(`<code>avg_over_time(test_latency{source_id="test"}[100m])</code>`))
 
@@ -56,6 +55,7 @@ func TestRenderIndicatorHTML(t *testing.T) {
 		g.Expect(html).To(ContainSubstring("<em>Yellow warning</em>: &gt; 500<br/>"))
 		g.Expect(html).To(ContainSubstring("<em>super_green</em>: &lt; 10<br/>"))
 		g.Expect(html).To(ContainSubstring("dynamic!"))
+		g.Expect(html).ToNot(ContainSubstring("Threshold Note"))
 		g.Expect(html).To(ContainSubstring("Recommended Response"))
 
 		g.Expect(html).ToNot(ContainSubstring("%%"))
@@ -96,9 +96,10 @@ func TestRenderIndicatorHTML(t *testing.T) {
 		ind := docs.NewIndicatorPresenter(indicator)
 		html := string(ind.HTML())
 
+		g.Expect(html).To(ContainSubstring("dynamic!"))
+		g.Expect(html).ToNot(ContainSubstring("Threshold Note"))
 		g.Expect(html).To(ContainSubstring("Recommended Response"))
 		g.Expect(html).To(ContainSubstring("<p><em>test response</em> of kpi</p>"))
-		g.Expect(html).To(ContainSubstring("dynamic!"))
 
 		g.Expect(html).ToNot(ContainSubstring("%%"))
 	})
