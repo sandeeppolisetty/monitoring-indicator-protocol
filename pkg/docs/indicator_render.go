@@ -83,6 +83,11 @@ func (p indicatorPresenter) Description() template.HTML {
 }
 
 func (p indicatorPresenter) ThresholdNote() template.HTML {
+	camelValue := p.markdownDocumentationField("thresholdNote")
+	if camelValue != "" {
+		return camelValue
+	}
+
 	return p.markdownDocumentationField("threshold_note")
 }
 
@@ -100,7 +105,7 @@ func (p indicatorPresenter) OtherDocumentationFields() map[string]template.HTML 
 }
 
 func isUnusedDocumentationField(fieldName string) bool {
-	return fieldName != "title" && fieldName != "description" && fieldName != "threshold_note"
+	return fieldName != "title" && fieldName != "description" && fieldName != "thresholdNote"
 }
 
 func (p indicatorPresenter) markdownDocumentationField(field string) template.HTML {
