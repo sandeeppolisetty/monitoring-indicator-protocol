@@ -4,6 +4,7 @@ require (
 	code.cloudfoundry.org/go-envstruct v1.4.0
 	github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
+	github.com/cloudfoundry-community/go-cfclient v0.0.0-20190201205600-f136f9222381 // indirect
 	github.com/cppforlife/go-patch v0.2.0
 	github.com/evanphx/json-patch v4.1.0+incompatible // indirect
 	github.com/go-kit/kit v0.8.0 // indirect
