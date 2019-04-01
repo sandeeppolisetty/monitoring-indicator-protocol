@@ -2,10 +2,13 @@ package e2e_test
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math"
 	"math/rand"
+	"net/http"
 	"os/user"
 	"strings"
 	"testing"
@@ -33,9 +36,31 @@ type k8sClients struct {
 }
 
 var clients k8sClients
+var httpClient *http.Client
+var grafanaURI, grafanaAdminUser, grafanaAdminPw *string
 
 func init() {
+
+	httpClient = &http.Client{
+		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+		},
+	}
 	rand.Seed(time.Now().UnixNano())
+	grafanaURI = flag.String("grafana-uri", "", "")
+	grafanaAdminUser = flag.String("grafana-admin-user", "", "")
+	grafanaAdminPw = flag.String("grafana-admin-pw", "", "")
+	flag.Parse()
+	if *grafanaURI == "" {
+		log.Panic("Oh no! Grafana URI not provided")
+	}
+	if *grafanaAdminUser == "" {
+		log.Panic("Oh no! Grafana user not provided")
+	}
+	if *grafanaAdminPw == "" {
+		log.Panic("Oh no! Grafana password not provided")
+	}
 	config, err := clientcmd.BuildConfigFromFlags("", expandHome("~/.kube/config"))
 	if err != nil {
 		log.Panic(err.Error())
@@ -63,7 +88,11 @@ func TestConfigMaps(t *testing.T) {
 					t.Logf("Unable to get config map: %s", err)
 					return false
 				}
-				return grafanaConfigMapMatch(t, grafanaDashboardFilename(id)+".json", cm, id)
+				match := grafanaConfigMapMatch(t, grafanaDashboardFilename(id)+".json", cm, id)
+				if !match {
+					return false
+				}
+				return grafanaApiResponseMatch(t, id)
 			}
 		},
 		"prometheus": func(id *v1alpha1.IndicatorDocument) func() bool {
@@ -93,6 +122,35 @@ func TestConfigMaps(t *testing.T) {
 			g.Eventually(tc(id), 5).Should(BeTrue())
 		})
 	}
+}
+
+func grafanaApiResponseMatch(t *testing.T, document *v1alpha1.IndicatorDocument) bool {
+	request, err := http.NewRequest("GET", fmt.Sprintf("http://%s/api/search?query=%s", *grafanaURI, document.ObjectMeta.Name), nil)
+	if err != nil {
+		t.Logf("Unable to create request to get Grafana config through API: %s", err)
+		return false
+	}
+	request.SetBasicAuth(*grafanaAdminUser, *grafanaAdminPw)
+	response, err := httpClient.Do(request)
+	if err != nil {
+		t.Logf("Unable to retrieve config through Grafana API: %s", err)
+		return false
+	}
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		t.Logf("Unable to read Grafana config response body: %s", err)
+		return false
+	}
+	var results []grafanaSearchResult
+	err = json.Unmarshal(body, &results)
+	if err != nil {
+		t.Logf("Unable to unmarshal Grafana config response body: %s", err)
+	}
+	return len(results) == 1
+}
+
+type grafanaSearchResult struct {
+	Title string `json:"title"`
 }
 
 func grafanaConfigMapMatch(t *testing.T, dashboardFilename string, cm *v1.ConfigMap, id *v1alpha1.IndicatorDocument) bool {
